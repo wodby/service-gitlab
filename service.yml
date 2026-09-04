@@ -89,6 +89,8 @@ integrations:
   variables:
   - name: GITLAB_OBJECT_STORAGE_CONNECTION
     secret: true
+  - name: GITLAB_BACKUP_S3_CONFIG
+    secret: true
   - name: GITLAB_ARTIFACTS_BUCKET
   - name: GITLAB_LFS_BUCKET
   - name: GITLAB_UPLOADS_BUCKET
@@ -98,6 +100,9 @@ integrations:
   env:
   - name: GITLAB_OBJECT_STORAGE_CONNECTION
     value: '{{integration.variables.GITLAB_OBJECT_STORAGE_CONNECTION}}'
+    secret: true
+  - name: GITLAB_BACKUP_S3_CONFIG
+    value: '{{integration.variables.GITLAB_BACKUP_S3_CONFIG}}'
     secret: true
 
 volumes:
@@ -135,6 +140,8 @@ helm:
     value: GITLAB_ROOT_PASSWORD
   - name: global.gatewayApi.enabled
     value: false
+  - name: global.batch.cronJob.apiVersion
+    value: batch/v1
   - name: global.gatewayApi.installEnvoy
     value: false
   - name: global.gatewayApi.configureCertmanager
@@ -207,6 +214,42 @@ helm:
     value: '{{integrations.object-storage.variables.GITLAB_BACKUPS_BUCKET}}'
   - name: global.appConfig.backups.tmpBucket
     value: '{{integrations.object-storage.variables.GITLAB_BACKUPS_TMP_BUCKET}}'
+  - name: gitlab.toolbox.backups.objectStorage.config
+    value:
+      secret: '{{service.secrets.env}}'
+      key: GITLAB_BACKUP_S3_CONFIG
+  - name: gitlab.toolbox.backups.cron
+    value:
+      enabled: true
+      schedule: '0 1 * * *'
+      concurrencyPolicy: Forbid
+      failedJobsHistoryLimit: 3
+      successfulJobsHistoryLimit: 3
+      backoffLimit: 1
+      activeDeadlineSeconds: 21600
+      ttlSecondsAfterFinished: 86400
+      safeToEvict: false
+      restartPolicy: OnFailure
+      extraArgs: >-
+        --skip registry
+        --skip pages
+        --skip external_diffs
+        --skip terraform_state
+        --skip ci_secure_files
+        --skip agent_plan_content
+        --skip ci_catalog_bundles
+      persistence:
+        enabled: true
+        useGenericEphemeralVolume: true
+        accessMode: ReadWriteOnce
+        size: 100Gi
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: '2'
+          memory: 2Gi
   - name: installCertmanager
     value: false
   - name: prometheus.install
