@@ -23,6 +23,16 @@ endpoints:
     number: 8181
     protocol: http
     main: true
+- name: registry
+  workload: registry
+  ports:
+  - name: http-registry
+    number: 5000
+    protocol: http
+    main: true
+    routeDefaults:
+      request_timeout: 15m
+      backend_request_timeout: 15m
 - name: ssh
   workload: shell
   ports:
@@ -95,6 +105,9 @@ integrations:
   - name: GITLAB_LFS_BUCKET
   - name: GITLAB_UPLOADS_BUCKET
   - name: GITLAB_PACKAGES_BUCKET
+  - name: GITLAB_REGISTRY_BUCKET
+  - name: GITLAB_REGISTRY_STORAGE_CONFIG
+    secret: true
   - name: GITLAB_BACKUPS_BUCKET
   - name: GITLAB_BACKUPS_TMP_BUCKET
   env:
@@ -103,6 +116,9 @@ integrations:
     secret: true
   - name: GITLAB_BACKUP_S3_CONFIG
     value: '{{integration.variables.GITLAB_BACKUP_S3_CONFIG}}'
+    secret: true
+  - name: GITLAB_REGISTRY_STORAGE_CONFIG
+    value: '{{integration.variables.GITLAB_REGISTRY_STORAGE_CONFIG}}'
     secret: true
 
 volumes:
@@ -177,7 +193,11 @@ helm:
   - name: global.kas.enabled
     value: false
   - name: global.registry.enabled
-    value: false
+    value: true
+  - name: global.registry.bucket
+    value: '{{integrations.object-storage.variables.GITLAB_REGISTRY_BUCKET}}'
+  - name: global.hosts.registry.name
+    value: '{{service.endpoints.registry.primaryHost}}'
   - name: global.pages.enabled
     value: false
   - name: global.shell.port
@@ -231,7 +251,6 @@ helm:
       safeToEvict: false
       restartPolicy: OnFailure
       extraArgs: >-
-        --skip registry
         --skip pages
         --skip external_diffs
         --skip terraform_state
@@ -257,7 +276,11 @@ helm:
   - name: gitlab-runner.install
     value: false
   - name: registry.enabled
-    value: false
+    value: true
+  - name: registry.storage.secret
+    value: '{{service.secrets.env}}'
+  - name: registry.storage.key
+    value: GITLAB_REGISTRY_STORAGE_CONFIG
   - name: gitlab.gitlab-exporter.enabled
     value: false
   - name: gitlab.kas.enabled
@@ -310,6 +333,18 @@ workloads:
   - name: gitlab-shell
     helm:
       resources: gitlab.gitlab-shell.resources
+- name: registry
+  selector:
+    matchLabels:
+      app: registry
+      release: '{{helm.release}}'
+  kind: deployment
+  helm:
+    managedReplicas: true
+  containers:
+  - name: registry
+    helm:
+      resources: registry.resources
 - name: toolbox
   selector:
     matchLabels:

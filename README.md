@@ -5,26 +5,30 @@ Wodby 2 service manifest for GitLab Community Edition, based on the official
 
 ## Runtime contract
 
-The service provides GitLab's web application and API, Git over HTTPS and SSH, Sidekiq background jobs, a Toolbox
-workload, and persistent Gitaly repository storage. It requires links to:
+The service provides GitLab's web application and API, Git over HTTPS and SSH, the Container Registry, Sidekiq
+background jobs, a Toolbox workload, and persistent Gitaly repository storage. It requires links to:
 
 - PostgreSQL with the GitLab-required `amcheck`, `btree_gist`, and `pg_trgm` extensions
 - a Redis-compatible datastore such as Valkey
 - an SMTP relay
 
 It also requires an S3-compatible object-storage integration. The integration must provide the connection YAML
-expected by the GitLab chart, an `s3cmd` configuration file for the backup utility, and distinct, pre-created bucket
-names for artifacts, LFS objects, uploads, packages, backups, and temporary restore data.
+expected by the GitLab chart, a Registry storage configuration, an `s3cmd` configuration file for the backup utility,
+and distinct, pre-created bucket names for artifacts, LFS objects, uploads, packages, Registry data, backups, and
+temporary restore data. The Registry storage configuration is the contents of the Registry's `storage` block, with an
+S3-compatible driver and the Registry bucket configured.
+
+The Registry is available on its own public endpoint. Container image names use that endpoint as the registry host;
+projects expose the exact `docker login`, build, and push commands in GitLab's UI.
 
 The initial administrator username is `root`. Wodby generates its password as the `root_password` service token and
 stores it in the service environment Secret consumed by the GitLab migrations job.
 
 ## Deliberately external or disabled capabilities
 
-- GitLab Runner is not installed. Register a separate Runner to execute CI/CD jobs; GitLab recommends separate runners
-  for production deployments.
-- Container Registry, GitLab Pages, the Kubernetes Agent Server, incoming email, and the bundled monitoring stack are
-  disabled.
+- GitLab Runner is not installed in this release. Register the separate Wodby GitLab Runner service to execute CI/CD
+  jobs; GitLab recommends separate runners for production deployments.
+- GitLab Pages, the Kubernetes Agent Server, incoming email, and the bundled monitoring stack are disabled.
 
 The bundled Gitaly workload is a single repository-storage instance. Production or high-availability installations
 should follow GitLab's
@@ -33,9 +37,9 @@ should follow GitLab's
 ## Backups and restore
 
 The chart runs GitLab's Toolbox `backup-utility` daily at 01:00 in the Kubernetes controller's time zone. Each backup
-includes the GitLab database, Gitaly repositories and wikis, and the configured GitLab object-storage data, then
-uploads the archive to `GITLAB_BACKUPS_BUCKET`. Overlapping runs are forbidden and each run has a six-hour deadline.
-These archives are managed directly in that bucket and do not appear as Wodby backup records.
+includes the GitLab database, Gitaly repositories and wikis, Registry images, and the configured GitLab object-storage
+data, then uploads the archive to `GITLAB_BACKUPS_BUCKET`. Overlapping runs are forbidden and each run has a six-hour
+deadline. These archives are managed directly in that bucket and do not appear as Wodby backup records.
 
 Backup assembly uses a dynamically provisioned, 100 GiB generic ephemeral volume. Ensure the cluster has
 enough provisionable storage for the uncompressed backup working set; increase this value before stored data approaches
