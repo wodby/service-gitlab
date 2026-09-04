@@ -1,0 +1,369 @@
+name: gitlab
+icon: gitlab
+title: GitLab Community Edition
+type: service
+scalable: false
+
+labels:
+- gitlab
+- git
+- scm
+
+options:
+- version: '19'
+  tag: '19.3.1'
+  default: true
+
+endpoints:
+- name: web
+  workload: webservice
+  main: true
+  ports:
+  - name: http-workhorse
+    number: 8181
+    protocol: http
+    main: true
+- name: registry
+  workload: registry
+  ports:
+  - name: http-registry
+    number: 5000
+    protocol: http
+    main: true
+    routeDefaults:
+      request_timeout: 15m
+      backend_request_timeout: 15m
+- name: ssh
+  workload: shell
+  ports:
+  - name: ssh
+    number: 22
+    protocol: tcp
+    main: true
+    redeployOnPublicPortChange: true
+    routeToPublicPort: true
+
+tokens:
+- name: root_password
+  generate:
+    regex: '[0-9A-Za-z]{32}'
+
+env:
+- name: GITLAB_ROOT_PASSWORD
+  value: '{{tokens.root_password}}'
+
+links:
+- name: postgres
+  title: PostgreSQL
+  required: true
+  env:
+  - name: GITLAB_POSTGRES_PASSWORD
+    value: '{{link.database.user.password}}'
+    secret: true
+  selectors:
+  - type: db
+    labels:
+    - postgres
+- name: redis
+  title: Redis-compatible datastore
+  required: true
+  env:
+  - name: GITLAB_REDIS_PASSWORD
+    value: '{{link.tokens.password}}'
+    secret: true
+  selectors:
+  - type: datastore
+    labels:
+    - valkey
+  - type: datastore
+    labels:
+    - redis
+- name: sendmail
+  title: SMTP relay
+  required: true
+  helm:
+  - name: global.smtp.address
+    value: '{{link.host}}'
+  - name: global.smtp.port
+    value: '{{link.port}}'
+  selectors:
+  - type: service
+    labels:
+    - smtp
+
+integrations:
+- name: object-storage
+  title: S3-compatible object storage
+  type: variable
+  required: true
+  variables:
+  - name: GITLAB_OBJECT_STORAGE_CONNECTION
+    secret: true
+  - name: GITLAB_BACKUP_S3_CONFIG
+    secret: true
+  - name: GITLAB_ARTIFACTS_BUCKET
+  - name: GITLAB_LFS_BUCKET
+  - name: GITLAB_UPLOADS_BUCKET
+  - name: GITLAB_PACKAGES_BUCKET
+  - name: GITLAB_REGISTRY_BUCKET
+  - name: GITLAB_REGISTRY_STORAGE_CONFIG
+    secret: true
+  - name: GITLAB_BACKUPS_BUCKET
+  - name: GITLAB_BACKUPS_TMP_BUCKET
+  env:
+  - name: GITLAB_OBJECT_STORAGE_CONNECTION
+    value: '{{integration.variables.GITLAB_OBJECT_STORAGE_CONNECTION}}'
+    secret: true
+  - name: GITLAB_BACKUP_S3_CONFIG
+    value: '{{integration.variables.GITLAB_BACKUP_S3_CONFIG}}'
+    secret: true
+  - name: GITLAB_REGISTRY_STORAGE_CONFIG
+    value: '{{integration.variables.GITLAB_REGISTRY_STORAGE_CONFIG}}'
+    secret: true
+
+volumes:
+- name: repositories
+  title: Git repositories
+  size: 50
+  helm:
+    labels: gitlab.gitaly.persistence.labels
+    values:
+    - name: gitlab.gitaly.persistence.enabled
+      value: true
+    - name: gitlab.gitaly.persistence.size
+      value: '{{volumes.repositories.size}}Gi'
+    - name: gitlab.gitaly.persistence.storageClass
+      value: '{{volumes.repositories.storageClassName}}'
+
+helm:
+  name: gitlab
+  source: https://charts.gitlab.io
+  chart: gitlab/gitlab
+  version: 10.3.1
+  imagePullSecrets: ''
+  valueMappings:
+    disableNameOverride: true
+  values:
+  - name: global.edition
+    value: ce
+  - name: global.hosts.https
+    value: true
+  - name: global.hosts.gitlab.name
+    value: '{{service.primaryHost}}'
+  - name: global.initialRootPassword.secret
+    value: '{{service.secrets.env}}'
+  - name: global.initialRootPassword.key
+    value: GITLAB_ROOT_PASSWORD
+  - name: global.gatewayApi.enabled
+    value: false
+  - name: global.batch.cronJob.apiVersion
+    value: batch/v1
+  - name: global.gatewayApi.installEnvoy
+    value: false
+  - name: global.gatewayApi.configureCertmanager
+    value: false
+  - name: global.ingress.enabled
+    value: false
+  - name: global.ingress.configureCertmanager
+    value: false
+  - name: global.ingress.tls.enabled
+    value: false
+  - name: global.psql.host
+    value: '{{links.postgres.database.host}}'
+  - name: global.psql.port
+    value: '{{links.postgres.database.port}}'
+  - name: global.psql.username
+    value: '{{links.postgres.database.user.name}}'
+  - name: global.psql.database
+    value: '{{links.postgres.database.db.name}}'
+  - name: global.psql.password.secret
+    value: '{{service.secrets.env}}'
+  - name: global.psql.password.key
+    value: GITLAB_POSTGRES_PASSWORD
+  - name: global.redis.host
+    value: '{{links.redis.host}}'
+  - name: global.redis.port
+    value: '{{links.redis.port}}'
+  - name: global.redis.auth.enabled
+    value: true
+  - name: global.redis.auth.secret
+    value: '{{service.secrets.env}}'
+  - name: global.redis.auth.key
+    value: GITLAB_REDIS_PASSWORD
+  - name: global.kas.enabled
+    value: false
+  - name: global.registry.enabled
+    value: true
+  - name: global.registry.bucket
+    value: '{{integrations.object-storage.variables.GITLAB_REGISTRY_BUCKET}}'
+  - name: global.hosts.registry.name
+    value: '{{service.endpoints.registry.primaryHost}}'
+  - name: global.pages.enabled
+    value: false
+  - name: global.shell.port
+    value: '{{service.endpoints.ssh.ports.ssh.effectivePort}}'
+  - name: global.smtp.enabled
+    value: true
+  - name: global.smtp.authentication
+    value: ''
+  - name: global.smtp.domain
+    value: '{{service.primaryHost}}'
+  - name: global.smtp.starttls_auto
+    value: false
+  - name: global.email.from
+    value: 'gitlab@{{service.primaryHost}}'
+  - name: global.email.reply_to
+    value: 'noreply@{{service.primaryHost}}'
+  - name: global.appConfig.object_store.enabled
+    value: true
+  - name: global.appConfig.object_store.proxy_download
+    value: true
+  - name: global.appConfig.object_store.connection.secret
+    value: '{{service.secrets.env}}'
+  - name: global.appConfig.object_store.connection.key
+    value: GITLAB_OBJECT_STORAGE_CONNECTION
+  - name: global.appConfig.artifacts.bucket
+    value: '{{integrations.object-storage.variables.GITLAB_ARTIFACTS_BUCKET}}'
+  - name: global.appConfig.lfs.bucket
+    value: '{{integrations.object-storage.variables.GITLAB_LFS_BUCKET}}'
+  - name: global.appConfig.uploads.bucket
+    value: '{{integrations.object-storage.variables.GITLAB_UPLOADS_BUCKET}}'
+  - name: global.appConfig.packages.bucket
+    value: '{{integrations.object-storage.variables.GITLAB_PACKAGES_BUCKET}}'
+  - name: global.appConfig.backups.bucket
+    value: '{{integrations.object-storage.variables.GITLAB_BACKUPS_BUCKET}}'
+  - name: global.appConfig.backups.tmpBucket
+    value: '{{integrations.object-storage.variables.GITLAB_BACKUPS_TMP_BUCKET}}'
+  - name: gitlab.toolbox.backups.objectStorage.config
+    value:
+      secret: '{{service.secrets.env}}'
+      key: GITLAB_BACKUP_S3_CONFIG
+  - name: gitlab.toolbox.backups.cron
+    value:
+      enabled: true
+      schedule: '0 1 * * *'
+      concurrencyPolicy: Forbid
+      failedJobsHistoryLimit: 3
+      successfulJobsHistoryLimit: 3
+      backoffLimit: 1
+      activeDeadlineSeconds: 21600
+      ttlSecondsAfterFinished: 86400
+      safeToEvict: false
+      restartPolicy: OnFailure
+      extraArgs: >-
+        --skip pages
+        --skip external_diffs
+        --skip terraform_state
+        --skip ci_secure_files
+        --skip agent_plan_content
+        --skip ci_catalog_bundles
+      persistence:
+        enabled: true
+        useGenericEphemeralVolume: true
+        accessMode: ReadWriteOnce
+        size: 100Gi
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: '2'
+          memory: 2Gi
+  - name: installCertmanager
+    value: false
+  - name: prometheus.install
+    value: false
+  - name: gitlab-runner.install
+    value: false
+  - name: registry.enabled
+    value: true
+  - name: registry.storage.secret
+    value: '{{service.secrets.env}}'
+  - name: registry.storage.key
+    value: GITLAB_REGISTRY_STORAGE_CONFIG
+  - name: gitlab.gitlab-exporter.enabled
+    value: false
+  - name: gitlab.kas.enabled
+    value: false
+  - name: gitlab.gitlab-pages.enabled
+    value: false
+  - name: gitlab.mailroom.enabled
+    value: false
+
+workloads:
+- name: webservice
+  selector:
+    matchLabels:
+      app: webservice
+      release: '{{helm.release}}'
+      gitlab.com/webservice-name: default
+  kind: deployment
+  primary: true
+  helm:
+    managedReplicas: true
+  containers:
+  - name: webservice
+    helm:
+      resources: gitlab.webservice.resources
+  - name: gitlab-workhorse
+    helm:
+      resources: gitlab.webservice.workhorse.resources
+- name: sidekiq
+  selector:
+    matchLabels:
+      app: sidekiq
+      release: '{{helm.release}}'
+      queue-pod-name: all-in-1
+  kind: deployment
+  helm:
+    managedReplicas: true
+  containers:
+  - name: sidekiq
+    helm:
+      resources: gitlab.sidekiq.resources
+- name: shell
+  selector:
+    matchLabels:
+      app: gitlab-shell
+      release: '{{helm.release}}'
+  kind: deployment
+  helm:
+    managedReplicas: true
+  containers:
+  - name: gitlab-shell
+    helm:
+      resources: gitlab.gitlab-shell.resources
+- name: registry
+  selector:
+    matchLabels:
+      app: registry
+      release: '{{helm.release}}'
+  kind: deployment
+  helm:
+    managedReplicas: true
+  containers:
+  - name: registry
+    helm:
+      resources: registry.resources
+- name: toolbox
+  selector:
+    matchLabels:
+      app: toolbox
+      release: '{{helm.release}}'
+  kind: deployment
+  helm:
+    replicas: gitlab.toolbox.replicas
+  containers:
+  - name: toolbox
+    helm:
+      resources: gitlab.toolbox.resources
+- name: gitaly
+  selector:
+    matchLabels:
+      app: gitaly
+      release: '{{helm.release}}'
+  kind: statefulset
+  containers:
+  - name: gitaly
+    helm:
+      resources: gitlab.gitaly.resources
