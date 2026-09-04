@@ -33,6 +33,15 @@ endpoints:
     redeployOnPublicPortChange: true
     routeToPublicPort: true
 
+tokens:
+- name: root_password
+  generate:
+    regex: '[0-9A-Za-z]{32}'
+
+env:
+- name: GITLAB_ROOT_PASSWORD
+  value: '{{tokens.root_password}}'
+
 links:
 - name: postgres
   title: PostgreSQL
@@ -59,6 +68,18 @@ links:
   - type: datastore
     labels:
     - redis
+- name: sendmail
+  title: SMTP relay
+  required: true
+  helm:
+  - name: global.smtp.address
+    value: '{{link.host}}'
+  - name: global.smtp.port
+    value: '{{link.port}}'
+  selectors:
+  - type: service
+    labels:
+    - smtp
 
 integrations:
 - name: object-storage
@@ -108,6 +129,10 @@ helm:
     value: true
   - name: global.hosts.gitlab.name
     value: '{{service.primaryHost}}'
+  - name: global.initialRootPassword.secret
+    value: '{{service.secrets.env}}'
+  - name: global.initialRootPassword.key
+    value: GITLAB_ROOT_PASSWORD
   - name: global.gatewayApi.enabled
     value: false
   - name: global.gatewayApi.installEnvoy
@@ -150,6 +175,18 @@ helm:
     value: false
   - name: global.shell.port
     value: '{{service.endpoints.ssh.ports.ssh.effectivePort}}'
+  - name: global.smtp.enabled
+    value: true
+  - name: global.smtp.authentication
+    value: ''
+  - name: global.smtp.domain
+    value: '{{service.primaryHost}}'
+  - name: global.smtp.starttls_auto
+    value: false
+  - name: global.email.from
+    value: 'gitlab@{{service.primaryHost}}'
+  - name: global.email.reply_to
+    value: 'noreply@{{service.primaryHost}}'
   - name: global.appConfig.object_store.enabled
     value: true
   - name: global.appConfig.object_store.proxy_download
