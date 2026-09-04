@@ -35,6 +35,7 @@ should follow GitLab's
 The chart runs GitLab's Toolbox `backup-utility` daily at 01:00 in the Kubernetes controller's time zone. Each backup
 includes the GitLab database, Gitaly repositories and wikis, and the configured GitLab object-storage data, then
 uploads the archive to `GITLAB_BACKUPS_BUCKET`. Overlapping runs are forbidden and each run has a six-hour deadline.
+These archives are managed directly in that bucket and do not appear as Wodby backup records.
 
 Backup assembly uses a dynamically provisioned, 100 GiB generic ephemeral volume. Ensure the cluster has
 enough provisionable storage for the uncompressed backup working set; increase this value before stored data approaches
