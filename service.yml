@@ -40,7 +40,6 @@ endpoints:
     number: 22
     protocol: tcp
     main: true
-    redeployOnPublicPortChange: true
     routeToPublicPort: true
 
 tokens:
