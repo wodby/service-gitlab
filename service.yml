@@ -11,7 +11,7 @@ labels:
 
 options:
 - version: '19'
-  tag: '19.3.1'
+  tag: '19.5.0'
   default: true
 
 endpoints:
@@ -139,7 +139,7 @@ helm:
   name: gitlab
   source: https://charts.gitlab.io
   chart: gitlab/gitlab
-  version: 10.3.1
+  version: 10.5.0
   imagePullSecrets: ''
   valueMappings:
     disableNameOverride: true
