@@ -146,6 +146,11 @@ helm:
   values:
   - name: global.edition
     value: ce
+  # GitLab's pods wait in an init container until the database migrations finish. By default it gives up after 30
+  # checks, about a minute and a half, and restarts; a first install's migrations take longer, and Wodby reports the
+  # restarts as a crash loop. 400 checks is about 20 minutes.
+  - name: global.extraEnv.WAIT_FOR_TIMEOUT
+    value: '400'
   - name: global.hosts.https
     value: true
   - name: global.hosts.gitlab.name
