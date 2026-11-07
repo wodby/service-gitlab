@@ -304,9 +304,17 @@ workloads:
     managedReplicas: true
   containers:
   - name: webservice
+    resources:
+      request:
+        cpu: 300
+        memory: 2384
     helm:
       resources: gitlab.webservice.resources
   - name: gitlab-workhorse
+    resources:
+      request:
+        cpu: 100
+        memory: 96
     helm:
       resources: gitlab.webservice.workhorse.resources
 - name: sidekiq
@@ -320,6 +328,10 @@ workloads:
     managedReplicas: true
   containers:
   - name: sidekiq
+    resources:
+      request:
+        cpu: 900
+        memory: 1920
     helm:
       resources: gitlab.sidekiq.resources
 - name: shell
@@ -332,6 +344,9 @@ workloads:
     managedReplicas: true
   containers:
   - name: gitlab-shell
+    resources:
+      request:
+        memory: 16
     helm:
       resources: gitlab.gitlab-shell.resources
 - name: registry
@@ -344,6 +359,10 @@ workloads:
     managedReplicas: true
   containers:
   - name: registry
+    resources:
+      request:
+        cpu: 50
+        memory: 32
     helm:
       resources: registry.resources
 - name: toolbox
@@ -356,6 +375,10 @@ workloads:
     replicas: gitlab.toolbox.replicas
   containers:
   - name: toolbox
+    resources:
+      request:
+        cpu: 50
+        memory: 336
     helm:
       resources: gitlab.toolbox.resources
 - name: gitaly
@@ -366,5 +389,9 @@ workloads:
   kind: statefulset
   containers:
   - name: gitaly
+    resources:
+      request:
+        cpu: 100
+        memory: 208
     helm:
       resources: gitlab.gitaly.resources
