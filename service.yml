@@ -306,15 +306,15 @@ workloads:
   - name: webservice
     resources:
       request:
-        cpu: 300
-        memory: 2384
+        cpu: 30
+        memory: 1952
     helm:
       resources: gitlab.webservice.resources
   - name: gitlab-workhorse
     resources:
       request:
-        cpu: 100
-        memory: 96
+        cpu: 10
+        memory: 80
     helm:
       resources: gitlab.webservice.workhorse.resources
 - name: sidekiq
@@ -330,8 +330,8 @@ workloads:
   - name: sidekiq
     resources:
       request:
-        cpu: 900
-        memory: 1920
+        cpu: 150
+        memory: 1104
     helm:
       resources: gitlab.sidekiq.resources
 - name: shell
@@ -361,7 +361,7 @@ workloads:
   - name: registry
     resources:
       request:
-        cpu: 50
+        cpu: 10
         memory: 32
     helm:
       resources: registry.resources
@@ -377,8 +377,8 @@ workloads:
   - name: toolbox
     resources:
       request:
-        cpu: 50
-        memory: 336
+        cpu: 10
+        memory: 16
     helm:
       resources: gitlab.toolbox.resources
 - name: gitaly
@@ -391,7 +391,7 @@ workloads:
   - name: gitaly
     resources:
       request:
-        cpu: 100
-        memory: 208
+        cpu: 10
+        memory: 144
     helm:
       resources: gitlab.gitaly.resources
