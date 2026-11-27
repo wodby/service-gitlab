@@ -139,7 +139,7 @@ helm:
   name: gitlab
   source: https://charts.gitlab.io
   chart: gitlab/gitlab
-  version: 10.5.10
+  version: 10.5.11
   imagePullSecrets: ''
   valueMappings:
     disableNameOverride: true
